@@ -8,16 +8,28 @@ Additionally, pre-built PostgreSQL Binary artifacts are available for download f
 
 | PostgreSQL Version | Supported OS | Supported Architecture | Download Link |
 |---------------------|--------------|-------------------------|---------------|
-| 17.2               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-17.2-linux_x86_64.tar.gz) |
-| 17.1               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-17.1-linux_x86_64.tar.gz) |
-| 17.0               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-17.0-linux_x86_64.tar.gz) |
-| 16.6               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-16.6-linux_x86_64.tar.gz) |
-| 16.5               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-16.5-linux_x86_64.tar.gz) |
-| 16.4               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-16.4-linux_x86_64.tar.gz) |
-| 16.3               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-16.3-linux_x86_64.tar.gz) |
-| 16.2               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-16.2-linux_x86_64.tar.gz) |
-| 16.1               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-16.1-linux_x86_64.tar.gz) |
-| 16.0               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-16.0-linux_x86_64.tar.gz) |
+| 18.0               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-18.0-linux_x86_64.tar.gz) |
+| 17.6               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-17.6-linux_x86_64.tar.gz) |
+| 17.5               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-17.5-linux_x86_64.tar.gz) |
+| 17.4               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-17.4-linux_x86_64.tar.gz) |
+| 17.3               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-17.3-linux_x86_64.tar.gz) |
+| 17.2               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-17.2-linux_x86_64.tar.gz) |
+| 17.1               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-17.1-linux_x86_64.tar.gz) |
+| 17.0               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-17.0-linux_x86_64.tar.gz) |
+| 16.10              | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.10-linux_x86_64.tar.gz) |
+| 16.9               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.9-linux_x86_64.tar.gz) |
+| 16.8               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.8-linux_x86_64.tar.gz) |
+| 16.7               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.7-linux_x86_64.tar.gz) |
+| 16.6               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.6-linux_x86_64.tar.gz) |
+| 16.5               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.5-linux_x86_64.tar.gz) |
+| 16.4               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.4-linux_x86_64.tar.gz) |
+| 16.3               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.3-linux_x86_64.tar.gz) |
+| 16.2               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.2-linux_x86_64.tar.gz) |
+| 16.1               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.1-linux_x86_64.tar.gz) |
+| 16.0               | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-16.0-linux_x86_64.tar.gz) |
+| 15.14              | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-15.14-linux_x86_64.tar.gz) |
+| 14.19              | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-14.19-linux_x86_64.tar.gz) |
+| 13.22              | Linux        | x86_64                 | [Download](https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-13.22-linux_x86_64.tar.gz) |
 
 ## Basic Usage
 
@@ -30,7 +42,7 @@ Additionally, pre-built PostgreSQL Binary artifacts are available for download f
    plugin_repo(
        name = "postgres",
        owner = "jackmarsh",
-       revision = "v0.0.2",
+       revision = "v0.0.3",
    )
    ```
 
@@ -50,7 +62,7 @@ Additionally, pre-built PostgreSQL Binary artifacts are available for download f
 
    postgres(
        name = "psql",
-       version = "17.2",
+       version = "18.0",
        visibility = ["PUBLIC"],
    )
    ```
@@ -66,7 +78,7 @@ You can pass `configure_flags` to the build rule like this:
 ```python
 postgres(
     name = "psql",
-    version = "17.2",
+    version = "18.0",
     configure_flags = ["--enable-debug", "--with-openssl"],
     visibility = ["PUBLIC"],
 )
@@ -117,7 +129,7 @@ Example:
 ```python
 remote_file(
     name = "psql",
-    url = "https://github.com/jackmarsh/postgres/releases/download/v0.0.2/psql-16.0-linux_x86_64.tar.gz",
+    url = "https://github.com/jackmarsh/postgres/releases/download/v0.0.3/psql-18.0-linux_x86_64.tar.gz",
     hashes = ["<hash of the file>"], # Optional
 )
 ```
