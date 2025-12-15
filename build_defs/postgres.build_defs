@@ -56,7 +56,6 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
             "lib": [f'{target}/psql/lib'],
             "include": [f'{target}/psql/include'],
             "share": [f'{target}/psql/share'],
-            "postgres": [f'{target}/psql/bin/postgres'],
         },
         cmd = ' && '.join([
             f'mkdir -p {target}/psql',
@@ -93,7 +92,6 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
                 "lib": [f'psql/lib'],
                 "include": [f'psql/include'],
                 "share": [f'psql/share'],
-                "postgres": [f'psql/bin/postgres'],
             },
             cmd='cp -r $SRCS_BIN $SRCS_LIB $SRCS_INCLUDE $SRCS_SHARE psql/',
             binary=True,
