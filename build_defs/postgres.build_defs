@@ -79,15 +79,21 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
             ],
         )
     else:
-        filegroup(
+        build_rule(
             name=name,
-            srcs=[
-                install + '|bin',
-                install + '|lib',
-                install + '|include',
-                install + '|share',
-            ],
-            deps = [install],
+            srcs={
+                "bin": [install + '|bin'],
+                "lib": [install + '|lib'],
+                "include": [install + '|include'],
+                "share": [install + '|share'],
+            },
+            outs={
+                "bin": [f'psql/bin'],
+                "lib": [f'psql/lib'],
+                "include": [f'psql/include'],
+                "share": [f'psql/share'],
+            },
+            cmd='cp -r $SRCS_BIN $SRCS_LIB $SRCS_INCLUDE $SRCS_SHARE psql/',
             binary=True,
             visibility=visibility,
         )
