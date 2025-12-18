@@ -127,7 +127,9 @@ def postgres_binary(name:str, version:str, hashes:list=[], visibility:list=[]):
             "include": ["psql/include"],
             "share": ["psql/share"],
         },
-        cmd = f"tar -xzf $SRC && mv {target}/psql .",
+        # Tarball extracts to bin/, lib/, include/, share/ directly
+        # Wrap in psql/ to match postgres() rule output structure
+        cmd = "mkdir -p psql && tar -xzf $SRC -C psql",
         binary = True,
         visibility = visibility,
     )
