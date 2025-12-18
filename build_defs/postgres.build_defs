@@ -97,3 +97,37 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
             binary=True,
             visibility=visibility,
         )
+
+
+def postgres_binary(name:str, version:str, hashes:list=[], visibility:list=[]):
+    """
+    Downloads pre-built PostgreSQL binaries from GitHub releases.
+    Much faster than building from source - just downloads ~10MB tarball.
+
+    Args:
+        name: Name of the rule
+        version: PostgreSQL version (e.g. "17.2")
+        hashes: Optional hashes for verification
+        visibility: Visibility declaration
+    """
+    target = "linux_x86_64"
+
+    tarball = remote_file(
+        name = tag(name, "tarball"),
+        url = f"https://github.com/becomeliminal/postgres/releases/download/v0.0.3/psql-{version}-{target}.tar.gz",
+        hashes = hashes,
+    )
+
+    return build_rule(
+        name = name,
+        srcs = [tarball],
+        outs = {
+            "bin": ["psql/bin"],
+            "lib": ["psql/lib"],
+            "include": ["psql/include"],
+            "share": ["psql/share"],
+        },
+        cmd = f"tar -xzf $SRC && mv {target}/psql .",
+        binary = True,
+        visibility = visibility,
+    )

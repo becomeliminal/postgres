@@ -121,11 +121,26 @@ This will ensure all dependencies are available in the path, allowing the `postg
 
 ---
 
-### Option 2: Use Pre-built Artifacts
+### Option 2: Use Pre-built Binaries (Recommended for RBE)
 
-If you prefer not to build PostgreSQL from source, you can directly download pre-built binaries from the [GitHub release assets](https://github.com/jackmarsh/postgres/releases).
+If you prefer not to build PostgreSQL from source, use the `postgres_binary` rule to download pre-built binaries. This is much faster, especially for Remote Build Execution (RBE) where workers just download ~10MB instead of compiling for 5-10 minutes.
 
-Example:
+```python
+subinclude("///postgres//build_defs:postgres")
+
+postgres_binary(
+    name = "postgres",
+    version = "17.2",
+    visibility = ["PUBLIC"],
+)
+```
+
+The `postgres_binary` rule provides the same output structure as `postgres` (`bin`, `lib`, `include`, `share`), so it's a drop-in replacement.
+
+#### Manual Download
+
+Alternatively, you can directly download pre-built binaries from the [GitHub release assets](https://github.com/jackmarsh/postgres/releases):
+
 ```python
 remote_file(
     name = "psql",
