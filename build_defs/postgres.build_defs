@@ -62,6 +62,31 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
             'export PKG_CONFIG_PATH="' + ':'.join(pkg_config_dirs) + ':${PKG_CONFIG_PATH:-}" && '
         )
 
+    install_cmds = [
+        f'mkdir -p {target}/psql',
+        'cd $SRC',
+        env_prefix + f'./configure --prefix "$HOME/{target}/psql" ' + ' '.join(configure_flags),
+        'make',
+        'make install',
+    ]
+    # On macOS, rewrite dylib paths from absolute to relative using @loader_path
+    # so that binaries find libpq relative to their own location.
+    if CONFIG.OS == 'darwin':
+        psql_dir = f'$HOME/{target}/psql'
+        install_cmds += [
+            f'install_name_tool -id @rpath/libpq.5.dylib {psql_dir}/lib/libpq.5.dylib',
+            f'test -L {psql_dir}/lib/libpq.dylib || install_name_tool -id @rpath/libpq.dylib {psql_dir}/lib/libpq.dylib',
+            f'for bin in {psql_dir}/bin/*; do '
+                f'if otool -L "$bin" 2>/dev/null | grep -q "libpq.5.dylib"; then '
+                    f'install_name_tool -change '
+                    f'"$(otool -L "$bin" | grep libpq.5.dylib | awk \'{{print $1}}\')" '
+                    f'@executable_path/../lib/libpq.5.dylib '
+                    f'"$bin"; '
+                f'fi; '
+            f'done',
+        ]
+    install_cmds.append('cd $HOME')
+
     install = build_rule(
         # Don't tag, --prefix doesn't recognise '#'.
         name=f'_{name}_{target}_install',
@@ -72,14 +97,7 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
             "include": [f'{target}/psql/include'],
             "share": [f'{target}/psql/share'],
         },
-        cmd = ' && '.join([
-            f'mkdir -p {target}/psql',
-            'cd $SRC',
-            env_prefix + f'./configure --prefix "$HOME/{target}/psql" ' + ' '.join(configure_flags),
-            'make',
-            'make install',
-            'cd $HOME',
-        ]),
+        cmd = ' && '.join(install_cmds),
         building_description = f'Installing PostgreSQL v{version} for {target}...',
     )
     if _compress:
