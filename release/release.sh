@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-REPO="jackmarsh/postgres"
+REPO="becomeliminal/postgres"
 
 # Get the latest release tag
 LATEST_TAG=$(gh release list --repo "$REPO" --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "v0.0.0")
