@@ -15,12 +15,14 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
         if CONFIG.OS == 'linux':
             os = 'linux'
         elif CONFIG.OS == 'darwin':
-            os = 'osx'
+            os = 'darwin'
         else:
             raise ParseError(f'Unknown OS {CONFIG.OS}, you must pass explitly')
     if not arch:
         if CONFIG.ARCH == 'amd64':
             arch = 'x86_64'
+        elif CONFIG.ARCH == 'arm64':
+            arch = 'arm64'
         elif CONFIG.ARCH == 'x86':
             arch = 'i686'
         else:
@@ -47,6 +49,19 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
         ]),
         building_description = f'Extracting PostgreSQL v{version} for {target}...',
     )
+    # On macOS, Homebrew keg-only packages need explicit paths for configure to find them,
+    # and /opt/homebrew/bin must be on PATH so pkg-config is available in the plz sandbox.
+    env_prefix = ''
+    if CONFIG.OS == 'darwin':
+        pkg_config_dirs = [
+            '/opt/homebrew/opt/icu4c/lib/pkgconfig',
+            '/opt/homebrew/opt/readline/lib/pkgconfig',
+        ]
+        env_prefix = (
+            'export PATH="/opt/homebrew/bin:$PATH" && '
+            'export PKG_CONFIG_PATH="' + ':'.join(pkg_config_dirs) + ':${PKG_CONFIG_PATH:-}" && '
+        )
+
     install = build_rule(
         # Don't tag, --prefix doesn't recognise '#'.
         name=f'_{name}_{target}_install',
@@ -60,7 +75,7 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
         cmd = ' && '.join([
             f'mkdir -p {target}/psql',
             'cd $SRC',
-            f'./configure --prefix "$HOME/{target}/psql" ' + ' '.join(configure_flags),
+            env_prefix + f'./configure --prefix "$HOME/{target}/psql" ' + ' '.join(configure_flags),
             'make',
             'make install',
             'cd $HOME',
@@ -110,11 +125,18 @@ def postgres_binary(name:str, version:str, hashes:list=[], visibility:list=[]):
         hashes: Optional hashes for verification
         visibility: Visibility declaration
     """
-    target = "linux_x86_64"
+    if CONFIG.OS == "linux":
+        target = "linux_x86_64"
+    elif CONFIG.OS == "darwin" and CONFIG.ARCH == "arm64":
+        target = "darwin_arm64"
+    elif CONFIG.OS == "darwin":
+        target = "darwin_x86_64"
+    else:
+        fail(f"No prebuilt postgres binary for {CONFIG.OS}/{CONFIG.ARCH}")
 
     tarball = remote_file(
         name = tag(name, "tarball"),
-        url = f"https://github.com/becomeliminal/postgres/releases/download/v0.0.3/psql-{version}-{target}.tar.gz",
+        url = f"https://github.com/becomeliminal/postgres/releases/download/v0.0.4/psql-{version}-{target}.tar.gz",
         hashes = hashes,
     )
 
