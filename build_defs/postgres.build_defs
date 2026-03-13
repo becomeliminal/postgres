@@ -65,9 +65,9 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
     install_cmds = [
         f'mkdir -p {target}/psql',
         'cd $SRC',
-        env_prefix + f'./configure --prefix "$HOME/{target}/psql" ' + ' '.join(configure_flags),
-        'make',
-        'make install',
+        env_prefix + f'./configure --prefix "$HOME/{target}/psql" --with-uuid=e2fs ' + ' '.join(configure_flags),
+        'make world-bin',
+        'make install-world-bin',
     ]
     # On macOS, rewrite dylib paths from absolute to relative using @loader_path
     # so that binaries find libpq relative to their own location.
@@ -98,6 +98,7 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
             "share": [f'{target}/psql/share'],
         },
         cmd = ' && '.join(install_cmds),
+        build_timeout = 1200,
         building_description = f'Installing PostgreSQL v{version} for {target}...',
     )
     if _compress:
@@ -132,29 +133,193 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
         )
 
 
-def postgres_binary(name:str, version:str, hashes:list=[], visibility:list=[]):
+def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version:str="1.6.0-rc0", age_pg_major:str="PG17", os=None, arch=None, hashes:list=[], visibility:list=[], configure_flags:list=[], _compress:bool=False):
     """
-    Downloads pre-built PostgreSQL binaries from GitHub releases.
-    Much faster than building from source - just downloads ~10MB tarball.
+    Builds PostgreSQL with all contrib modules plus pgvector and AGE extensions.
 
     Args:
         name: Name of the rule
-        version: PostgreSQL version (e.g. "17.2")
-        hashes: Optional hashes for verification
+        version: PostgreSQL version (e.g. "17.6")
+        pgvector_version: pgvector version (e.g. "0.8.0")
+        age_version: Apache AGE version (e.g. "1.6.0-rc0")
+        age_pg_major: AGE's PG major version tag (e.g. "PG17")
+        os: Target operating system. Defaults to current OS.
+        arch: Target architecture. Defaults to current architecture.
+        hashes: Optional hashes for the PostgreSQL source download
         visibility: Visibility declaration
+        configure_flags: Additional flags for PostgreSQL's configure script
     """
+    if not os:
+        if CONFIG.OS == 'linux':
+            os = 'linux'
+        elif CONFIG.OS == 'darwin':
+            os = 'darwin'
+        else:
+            raise ParseError(f'Unknown OS {CONFIG.OS}, you must pass explicitly')
+    if not arch:
+        if CONFIG.ARCH == 'amd64':
+            arch = 'x86_64'
+        elif CONFIG.ARCH == 'arm64':
+            arch = 'arm64'
+        elif CONFIG.ARCH == 'x86':
+            arch = 'i686'
+        else:
+            raise ParseError(f'Unknown architecture {CONFIG.ARCH}, you must pass explicitly')
+
+    target = f'{os}_{arch}'
+
+    # Download PostgreSQL source
+    pg_download = remote_file(
+        name=tag(name, f"pg_download_{target}"),
+        out=f"ai-postgresql-{version}.tar.gz",
+        url=f"https://ftp.postgresql.org/pub/source/v{version}/postgresql-{version}.tar.gz",
+        hashes=hashes,
+    )
+
+    # Download pgvector source
+    pgvector_download = remote_file(
+        name=tag(name, f"pgvector_download"),
+        out=f"ai-pgvector-{pgvector_version}.tar.gz",
+        url=f"https://github.com/pgvector/pgvector/archive/refs/tags/v{pgvector_version}.tar.gz",
+    )
+
+    # Download AGE source
+    age_download = remote_file(
+        name=tag(name, f"age_download"),
+        out=f"ai-age-{age_version}.tar.gz",
+        url=f"https://github.com/apache/age/archive/refs/tags/{age_pg_major}/v{age_version}.tar.gz",
+    )
+
+    env_prefix = ''
+    if CONFIG.OS == 'darwin':
+        pkg_config_dirs = [
+            '/opt/homebrew/opt/icu4c/lib/pkgconfig',
+            '/opt/homebrew/opt/readline/lib/pkgconfig',
+        ]
+        env_prefix = (
+            'export PATH="/opt/homebrew/bin:$PATH" && '
+            'export PKG_CONFIG_PATH="' + ':'.join(pkg_config_dirs) + ':${PKG_CONFIG_PATH:-}" && '
+        )
+
+    out_dir = f'ai-{target}'
+    psql_dir = f'$HOME/{out_dir}/psql'
+    install_cmds = [
+        f'mkdir -p {out_dir}/psql',
+        # Build and install PostgreSQL with all contrib modules
+        'tar -xzf $SRCS_PG',
+        f'cd postgresql-{version}',
+        env_prefix + f'./configure --prefix "{psql_dir}" --with-uuid=e2fs ' + ' '.join(configure_flags),
+        'make world-bin',
+        'make install-world-bin',
+        'cd $HOME',
+        # Build and install pgvector
+        'tar -xzf $SRCS_PGVECTOR',
+        f'cd pgvector-{pgvector_version}',
+        f"PG_CONFIG={psql_dir}/bin/pg_config make OPTFLAGS='-O2 -g'",
+        f'PG_CONFIG={psql_dir}/bin/pg_config make install',
+        'cd $HOME',
+        # Build and install AGE
+        'tar -xzf $SRCS_AGE',
+        f'cd age-{age_pg_major}-v{age_version}',
+        f"PG_CONFIG={psql_dir}/bin/pg_config make OPTFLAGS='-O2 -g'",
+        f'PG_CONFIG={psql_dir}/bin/pg_config make install',
+        'cd $HOME',
+    ]
+
+    if CONFIG.OS == 'darwin':
+        install_cmds += [
+            f'install_name_tool -id @rpath/libpq.5.dylib {psql_dir}/lib/libpq.5.dylib',
+            f'test -L {psql_dir}/lib/libpq.dylib || install_name_tool -id @rpath/libpq.dylib {psql_dir}/lib/libpq.dylib',
+            f'for bin in {psql_dir}/bin/*; do '
+                f'if otool -L "$bin" 2>/dev/null | grep -q "libpq.5.dylib"; then '
+                    f'install_name_tool -change '
+                    f'"$(otool -L "$bin" | grep libpq.5.dylib | awk \'{{print $1}}\')" '
+                    f'@executable_path/../lib/libpq.5.dylib '
+                    f'"$bin"; '
+                f'fi; '
+            f'done',
+            # Create .dylib symlinks for extension .so files
+            f'cd {psql_dir}/lib && for f in *.so; do [ -f "$f" ] && ln -sf "$f" "${{f%.so}}.dylib"; done',
+        ]
+
+    install = build_rule(
+        name=f'_{name}_{target}_install',
+        srcs={
+            "pg": [pg_download],
+            "pgvector": [pgvector_download],
+            "age": [age_download],
+        },
+        outs = {
+            "bin": [f'{out_dir}/psql/bin'],
+            "lib": [f'{out_dir}/psql/lib'],
+            "include": [f'{out_dir}/psql/include'],
+            "share": [f'{out_dir}/psql/share'],
+        },
+        cmd = ' && '.join(install_cmds),
+        build_timeout = 1200,
+        building_description = f'Installing PostgreSQL AI v{version} for {target}...',
+    )
+    if _compress:
+        tarball(
+            name=name,
+            out=f'psql-ai-{version}-{target}.tar.gz',
+            srcs=[
+                install + '|bin',
+                install + '|lib',
+                install + '|include',
+                install + '|share',
+            ],
+        )
+    else:
+        build_rule(
+            name=name,
+            srcs={
+                "bin": [install + '|bin'],
+                "lib": [install + '|lib'],
+                "include": [install + '|include'],
+                "share": [install + '|share'],
+            },
+            outs={
+                "bin": [f'psql/bin'],
+                "lib": [f'psql/lib'],
+                "include": [f'psql/include'],
+                "share": [f'psql/share'],
+            },
+            cmd='cp -r $SRCS_BIN $SRCS_LIB $SRCS_INCLUDE $SRCS_SHARE psql/',
+            binary=True,
+            visibility=visibility,
+        )
+
+
+RELEASE_VERSION = "v0.0.5"
+
+
+def _resolve_target():
     if CONFIG.OS == "linux":
-        target = "linux_x86_64"
+        return "linux_x86_64"
     elif CONFIG.OS == "darwin" and CONFIG.ARCH == "arm64":
-        target = "darwin_arm64"
+        return "darwin_arm64"
     elif CONFIG.OS == "darwin":
-        target = "darwin_x86_64"
+        return "darwin_x86_64"
     else:
         fail(f"No prebuilt postgres binary for {CONFIG.OS}/{CONFIG.ARCH}")
 
+
+def postgres_binary(name:str, version:str, hashes:list=[], visibility:list=[]):
+    """
+    Downloads pre-built PostgreSQL binaries (with all contrib modules) from GitHub releases.
+
+    Args:
+        name: Name of the rule
+        version: PostgreSQL version (e.g. "17.6")
+        hashes: Optional hashes for verification
+        visibility: Visibility declaration
+    """
+    target = _resolve_target()
+
     tarball = remote_file(
         name = tag(name, "tarball"),
-        url = f"https://github.com/becomeliminal/postgres/releases/download/v0.0.4/psql-{version}-{target}.tar.gz",
+        url = f"https://github.com/becomeliminal/postgres/releases/download/{RELEASE_VERSION}/psql-{version}-{target}.tar.gz",
         hashes = hashes,
     )
 
@@ -167,8 +332,39 @@ def postgres_binary(name:str, version:str, hashes:list=[], visibility:list=[]):
             "include": ["psql/include"],
             "share": ["psql/share"],
         },
-        # Tarball extracts to bin/, lib/, include/, share/ directly
-        # Wrap in psql/ to match postgres() rule output structure
+        cmd = "mkdir -p psql && tar -xzf $SRC -C psql",
+        binary = True,
+        visibility = visibility,
+    )
+
+
+def postgres_ai_binary(name:str, version:str, hashes:list=[], visibility:list=[]):
+    """
+    Downloads pre-built PostgreSQL AI binaries (contrib + pgvector + AGE) from GitHub releases.
+
+    Args:
+        name: Name of the rule
+        version: PostgreSQL version (e.g. "17.6")
+        hashes: Optional hashes for verification
+        visibility: Visibility declaration
+    """
+    target = _resolve_target()
+
+    tarball = remote_file(
+        name = tag(name, "tarball"),
+        url = f"https://github.com/becomeliminal/postgres/releases/download/{RELEASE_VERSION}/psql-ai-{version}-{target}.tar.gz",
+        hashes = hashes,
+    )
+
+    return build_rule(
+        name = name,
+        srcs = [tarball],
+        outs = {
+            "bin": ["psql/bin"],
+            "lib": ["psql/lib"],
+            "include": ["psql/include"],
+            "share": ["psql/share"],
+        },
         cmd = "mkdir -p psql && tar -xzf $SRC -C psql",
         binary = True,
         visibility = visibility,

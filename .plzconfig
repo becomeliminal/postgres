@@ -1,5 +1,5 @@
 [please]
-version = 17.8.7
+version = 17.28.0
 
 [Plugin "cc"]
 Target = //plugins:cc

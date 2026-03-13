@@ -5,3 +5,11 @@ postgres(
     version="17.1",
     _compress=True,
 )
+
+postgres_ai(
+    name="postgres_ai",
+    version="17.1",
+    age_version="1.6.0-rc0",
+    age_pg_major="PG17",
+    _compress=True,
+)
