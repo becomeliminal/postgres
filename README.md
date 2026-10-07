@@ -207,6 +207,19 @@ You may need to pass the `-L /path/to/psql/share` flag to `initdb`.
 
 You can find all available versions and corresponding binaries on the [releases page](https://github.com/becomeliminal/postgres/releases).
 
+Releases are built by CI, never from a laptop. The
+[Release binaries](.github/workflows/release.yaml) workflow builds every
+version under `binaries/` on `ubuntu-24.04` (linux_x86_64) and `macos-14`
+(darwin_arm64), and smoke-tests each tarball with `release/smoke_test.sh`
+(starts postgres, creates the extensions it ships). It runs on every pull
+request and push to master. To cut a release:
+
+1. Bump `RELEASE_VERSION` in `build_defs/postgres.build_defs` and merge.
+2. Push the matching tag: `git tag v0.0.N && git push origin v0.0.N`.
+
+The workflow publishes the release only if every build and smoke test passed,
+and refuses a tag that doesn't match `RELEASE_VERSION`.
+
 ---
 
 ## Need Additional Pre-Built Binaries?
