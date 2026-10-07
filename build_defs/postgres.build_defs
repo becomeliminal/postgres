@@ -66,7 +66,7 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
         f'mkdir -p {target}/psql',
         'cd $SRC',
         env_prefix + f'./configure --prefix "$HOME/{target}/psql" --with-uuid=e2fs ' + ' '.join(configure_flags),
-        'make world-bin',
+        'make -j"$(getconf _NPROCESSORS_ONLN)" world-bin',
         'make install-world-bin',
     ]
     # On macOS, rewrite dylib paths from absolute to relative using @loader_path
@@ -98,7 +98,7 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
             "share": [f'{target}/psql/share'],
         },
         cmd = ' && '.join(install_cmds),
-        build_timeout = 1200,
+        build_timeout = 3600,
         building_description = f'Installing PostgreSQL v{version} for {target}...',
     )
     if _compress:
@@ -209,7 +209,7 @@ def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version
         'tar -xzf $SRCS_PG',
         f'cd postgresql-{version}',
         env_prefix + f'./configure --prefix "{psql_dir}" --with-uuid=e2fs ' + ' '.join(configure_flags),
-        'make world-bin',
+        'make -j"$(getconf _NPROCESSORS_ONLN)" world-bin',
         'make install-world-bin',
         'cd $HOME',
         # Build and install pgvector
@@ -256,7 +256,7 @@ def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version
             "share": [f'{out_dir}/psql/share'],
         },
         cmd = ' && '.join(install_cmds),
-        build_timeout = 1200,
+        build_timeout = 3600,
         building_description = f'Installing PostgreSQL AI v{version} for {target}...',
     )
     if _compress:
@@ -291,7 +291,7 @@ def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version
         )
 
 
-RELEASE_VERSION = "v0.0.5"
+RELEASE_VERSION = "v0.0.6"
 
 
 def _resolve_target():
