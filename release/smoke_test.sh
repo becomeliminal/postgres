@@ -40,13 +40,16 @@ EOF
 
 psql() { "$BIN/psql" -h "$WORK" -d postgres --no-psqlrc -v ON_ERROR_STOP=1 -t -A "$@"; }
 
-psql -c 'CREATE EXTENSION "uuid-ossp";' -c 'SELECT uuid_generate_v4();'
-psql -c 'CREATE EXTENSION pg_stat_statements;' -c 'SELECT count(*) FROM pg_stat_statements;'
+# AI first: with age preloaded, older AGE releases (1.5 on PG13) fail other
+# queries until CREATE EXTENSION age has run, as a real consumer does at once.
 if [[ "$VARIANT" == "ai" ]]; then
-    psql -c 'CREATE EXTENSION vector;' -c "SELECT '[1,2,3]'::vector <-> '[1,2,4]'::vector;"
     psql -c 'CREATE EXTENSION age;' -c "LOAD 'age';" \
         -c 'SET search_path = ag_catalog, "$user", public;' \
         -c "SELECT create_graph('smoke');"
+    psql -c 'CREATE EXTENSION vector;' -c "SELECT '[1,2,3]'::vector <-> '[1,2,4]'::vector;"
 fi
+
+psql -c 'CREATE EXTENSION "uuid-ossp";' -c 'SELECT uuid_generate_v4();'
+psql -c 'CREATE EXTENSION pg_stat_statements;' -c 'SELECT count(*) FROM pg_stat_statements;'
 
 echo "PASS: $(basename "$TARBALL")"

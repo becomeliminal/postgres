@@ -238,8 +238,10 @@ def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version
                     f'"$bin"; '
                 f'fi; '
             f'done',
-            # Create .dylib symlinks for extension .so files
-            f'cd {psql_dir}/lib && for f in *.so; do [ -f "$f" ] && ln -sf "$f" "${{f%.so}}.dylib"; done',
+            # Create .dylib symlinks for extension .so files. PG16+ builds them
+            # as .dylib on macOS already, so there may be no *.so: the loop
+            # must not fail when the glob matches nothing.
+            f'cd {psql_dir}/lib && for f in *.so; do if [ -f "$f" ]; then ln -sf "$f" "${{f%.so}}.dylib"; fi; done',
         ]
 
     install = build_rule(
