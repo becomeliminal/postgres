@@ -212,13 +212,13 @@ Releases are built by CI, never from a laptop. The
 version under `binaries/` on `ubuntu-24.04` (linux_x86_64) and `macos-14`
 (darwin_arm64), and smoke-tests each tarball with `release/smoke_test.sh`
 (starts postgres, creates the extensions it ships). It runs on every pull
-request and push to master. To cut a release:
+request and push to master, and rebuilds only the versions whose inputs
+changed: the rest come from cache and are only smoke-tested.
 
-1. Bump `RELEASE_VERSION` in `build_defs/postgres.build_defs` and merge.
-2. Push the matching tag: `git tag v0.0.N && git push origin v0.0.N`.
-
-The workflow publishes the release only if every build and smoke test passed,
-and refuses a tag that doesn't match `RELEASE_VERSION`.
+To cut a release, bump `RELEASE_VERSION` in `build_defs/postgres.build_defs`
+and merge. The push to master publishes that release from what it built,
+tagged at the merge commit, once every build and smoke test has passed. A
+merge that leaves `RELEASE_VERSION` on an existing release publishes nothing.
 
 ---
 
