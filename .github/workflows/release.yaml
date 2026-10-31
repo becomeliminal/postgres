@@ -77,6 +77,11 @@ jobs:
       - name: Install build dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
+          # Xcode 16.2 (macOS SDK 15.2), as the binaries were built with on
+          # macos-14. The image's default SDK (15.4) declares strchrnul, which
+          # PostgreSQL releases before 16.9 and 17.5 then use unguarded and
+          # fail to compile.
+          sudo xcode-select -s /Applications/Xcode_16.2.app
           brew install icu4c readline pkgconf
           # postgres.build_defs finds them at these paths; fail here, not mid-configure
           test -d /opt/homebrew/opt/icu4c/lib/pkgconfig
