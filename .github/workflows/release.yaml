@@ -15,7 +15,7 @@
 #   linux_x86_64  ubuntu-24.04  pinned: the binaries link the runner's libicu
 #                               (74) and glibc (2.38), so they run on Ubuntu
 #                               24.04 or newer; moving the runner moves that
-#   darwin_arm64  macos-14      Apple Silicon
+#   darwin_arm64  macos-15      Apple Silicon
 #
 # To release: bump RELEASE_VERSION in build_defs/postgres.build_defs and merge.
 name: Release binaries
@@ -51,7 +51,7 @@ jobs:
       fail-fast: false
       matrix:
         version: ${{ fromJSON(needs.versions.outputs.versions) }}
-        runner: [ubuntu-24.04, macos-14]
+        runner: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.runner }}
     name: ${{ matrix.version }} (${{ matrix.runner }})
     steps:

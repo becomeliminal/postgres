@@ -209,7 +209,7 @@ You can find all available versions and corresponding binaries on the [releases 
 
 Releases are built by CI, never from a laptop. The
 [Release binaries](.github/workflows/release.yaml) workflow builds every
-version under `binaries/` on `ubuntu-24.04` (linux_x86_64) and `macos-14`
+version under `binaries/` on `ubuntu-24.04` (linux_x86_64) and `macos-15`
 (darwin_arm64), and smoke-tests each tarball with `release/smoke_test.sh`
 (starts postgres, creates the extensions it ships). It runs on every pull
 request and push to master. To cut a release:
