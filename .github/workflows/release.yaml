@@ -79,7 +79,10 @@ jobs:
           VERSION="${{ matrix.version }}"
           VERSION="${VERSION#v}"
           LATEST=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
-          if ./pleasew query changes --since "$LATEST" --level=-1 | grep -q "^//binaries/${{ matrix.version }}:"; then
+          # Captured first: piped straight into grep -q, plz would die of
+          # SIGPIPE on a match and pipefail would read "changed" as unchanged.
+          CHANGES=$(./pleasew query changes --since "$LATEST" --level=-1)
+          if grep -q "^//binaries/${{ matrix.version }}:" <<< "$CHANGES"; then
             echo "${{ matrix.version }} changed on $TARGET since $LATEST: building it."
             echo "reuse=false" >> "$GITHUB_OUTPUT"
             exit 0
