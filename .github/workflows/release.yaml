@@ -4,18 +4,24 @@
 # created when every build and test passed, so it never carries one platform
 # without the other.
 #
-# Only what changed is rebuilt. Each (version, platform) build is cached under
-# the hash of everything that decides its binaries; a hit restores the tarballs
-# and only re-runs the smoke test. GitHub scopes caches by branch: a PR sees
-# master's caches but master never sees a PR's, so a version a PR changes is
-# built once on the PR (to verify it) and once on master (to publish it), and
-# a PR can never put a binary into master's cache.
+# Only what changed is rebuilt. Each (version, platform) job asks Please, on
+# its own platform, whether that version's targets changed since the latest
+# release (`plz query changes`, which compares the rules at both commits). A
+# platform whose rules did not change takes its tarballs from that release, so
+# a macOS-only change never rebuilds Linux, and a new release carries the same
+# Linux binaries as the last. What did change is built, and cached under the
+# hash of everything that decides its binaries: GitHub scopes caches by
+# branch, so a PR sees master's caches but master never sees a PR's, and a
+# version a PR changes is built once on the PR (to verify it) and once on
+# master (to publish it). Reused or built, every tarball is smoke-tested.
 #
 # Platforms:
 #   linux_x86_64  ubuntu-24.04  pinned: the binaries link the runner's libicu
 #                               (74) and glibc (2.38), so they run on Ubuntu
 #                               24.04 or newer; moving the runner moves that
-#   darwin_arm64  macos-15      Apple Silicon
+#   darwin_arm64  macos-15      Apple Silicon; the binaries load only macOS's
+#                               own libraries (ICU is built from source and
+#                               linked in statically), never Homebrew's
 #
 # To release: bump RELEASE_VERSION in build_defs/postgres.build_defs and merge.
 name: Release binaries
@@ -54,19 +60,56 @@ jobs:
         runner: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.runner }}
     name: ${{ matrix.version }} (${{ matrix.runner }})
+    env:
+      TARGET: ${{ matrix.runner == 'macos-15' && 'darwin_arm64' || 'linux_x86_64' }}
     steps:
+      # Full history and tags: `plz query changes` reads the latest release's
+      # commit.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reuse the latest release's tarballs if nothing changed
+        id: reuse
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ matrix.version }}"
+          VERSION="${VERSION#v}"
+          LATEST=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          # Captured first: piped straight into grep -q, plz would die of
+          # SIGPIPE on a match and pipefail would read "changed" as unchanged.
+          CHANGES=$(./pleasew query changes --since "$LATEST" --level=-1)
+          if grep -q "^//binaries/${{ matrix.version }}:" <<< "$CHANGES"; then
+            echo "${{ matrix.version }} changed on $TARGET since $LATEST: building it."
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p dist
+          if gh release download "$LATEST" --repo "$GITHUB_REPOSITORY" --dir dist \
+              --pattern "psql-$VERSION-$TARGET.tar.gz" --pattern "psql-ai-$VERSION-$TARGET.tar.gz" \
+              && [[ -f "dist/psql-$VERSION-$TARGET.tar.gz" && -f "dist/psql-ai-$VERSION-$TARGET.tar.gz" ]]; then
+            echo "${{ matrix.version }} is unchanged on $TARGET since $LATEST: reusing its tarballs."
+            echo "reuse=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "$LATEST has no $TARGET tarballs for ${{ matrix.version }}: building it."
+            rm -rf dist
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+          fi
 
       # Everything that decides this version's binaries on this platform.
       - name: Restore this version's build
+        if: steps.reuse.outputs.reuse != 'true'
         id: cache
         uses: actions/cache/restore@v4
         with:
           path: dist
           key: psql-${{ matrix.runner }}-${{ matrix.version }}-${{ hashFiles(format('binaries/{0}/**', matrix.version), 'build_defs/**', 'plugins/**', '.plzconfig', 'pleasew', 'release/smoke_test.sh', '.github/workflows/release.yaml') }}
 
-      # Also needed on a cache hit: the smoke test runs the binaries, and the
-      # macOS ones load Homebrew's icu4c and readline.
+      # Also needed when nothing is built: the smoke test runs the binaries,
+      # and the Linux ones load the runner's libicu, libreadline and libuuid.
       - name: Install build dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -81,14 +124,12 @@ jobs:
           # macos-14. The image's default SDK (15.4) declares strchrnul, which
           # PostgreSQL releases before 16.9 and 17.5 then use unguarded and
           # fail to compile.
+          # Nothing from Homebrew: ICU is built from source by
+          # postgres.build_defs, and psql uses the system libedit.
           sudo xcode-select -s /Applications/Xcode_16.2.app
-          brew install icu4c readline pkgconf
-          # postgres.build_defs finds them at these paths; fail here, not mid-configure
-          test -d /opt/homebrew/opt/icu4c/lib/pkgconfig
-          test -d /opt/homebrew/opt/readline/lib/pkgconfig
 
       - name: Build
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           # Retries only network failures (40+ jobs downloading at once from
@@ -133,7 +174,7 @@ jobs:
       # Saved only after the smoke test passed, so the cache never holds a
       # build that failed it.
       - name: Save this version's build
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: dist

@@ -136,9 +136,15 @@ Building PostgreSQL from source requires the following tools and libraries to be
 - `perl`
 - `pkg-config`
 
-**Required Libraries:**
+**Required Libraries (Linux):**
 - `libicu-dev`
 - `libreadline-dev`
+
+On macOS nothing is needed beyond the Xcode Command Line Tools, and nothing
+comes from Homebrew. ICU (for PostgreSQL 16 and later) is built from source
+and linked in statically, and psql uses the system's libedit. Every library
+the binaries load is part of macOS or inside the install itself, so they keep
+working however Homebrew changes.
 
 ---
 

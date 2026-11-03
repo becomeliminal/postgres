@@ -52,47 +52,34 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
     # On macOS, Homebrew keg-only packages need explicit paths for configure to find them,
     # and /opt/homebrew/bin must be on PATH so pkg-config is available in the plz sandbox.
     env_prefix = ''
+    srcs = [extract]
+    src_dir = '$SRC'
     if CONFIG.OS == 'darwin':
-        pkg_config_dirs = [
-            '/opt/homebrew/opt/icu4c/lib/pkgconfig',
-            '/opt/homebrew/opt/readline/lib/pkgconfig',
-        ]
-        # The oldest macOS the binaries run on; without it, the build host's.
-        env_prefix = (
-            'export PATH="/opt/homebrew/bin:$PATH" && '
-            'export PKG_CONFIG_PATH="' + ':'.join(pkg_config_dirs) + ':${PKG_CONFIG_PATH:-}" && '
-            'export MACOSX_DEPLOYMENT_TARGET=14.0 && '
-        )
+        # Nothing from Homebrew: ICU is built here and linked in statically,
+        # so the binaries load only macOS's own libraries (psql's line editing
+        # is the system libedit).
+        env_prefix = _DARWIN_ENV
+        if _builds_with_icu(version):
+            icu = _darwin_icu(f'_{name}_icu_{target}')
+            srcs = {'pg': [extract], 'icu': [icu]}
+            src_dir = '$SRCS_PG'
+            configure_flags = configure_flags + _darwin_icu_configure_args()
 
     install_cmds = [
         f'mkdir -p {target}/psql',
-        'cd $SRC',
+        f'cd {src_dir}',
         env_prefix + f'./configure --prefix "$HOME/{target}/psql" --with-uuid=e2fs ' + ' '.join(configure_flags),
         'make -j"$(getconf _NPROCESSORS_ONLN)" world-bin',
         'make install-world-bin',
     ]
-    # On macOS, rewrite dylib paths from absolute to relative using @loader_path
-    # so that binaries find libpq relative to their own location.
     if CONFIG.OS == 'darwin':
-        psql_dir = f'$HOME/{target}/psql'
-        install_cmds += [
-            f'install_name_tool -id @rpath/libpq.5.dylib {psql_dir}/lib/libpq.5.dylib',
-            f'test -L {psql_dir}/lib/libpq.dylib || install_name_tool -id @rpath/libpq.dylib {psql_dir}/lib/libpq.dylib',
-            f'for bin in {psql_dir}/bin/*; do '
-                f'if otool -L "$bin" 2>/dev/null | grep -q "libpq.5.dylib"; then '
-                    f'install_name_tool -change '
-                    f'"$(otool -L "$bin" | grep libpq.5.dylib | awk \'{{print $1}}\')" '
-                    f'@executable_path/../lib/libpq.5.dylib '
-                    f'"$bin"; '
-                f'fi; '
-            f'done',
-        ]
+        install_cmds.append(_darwin_relocate(f'$HOME/{target}/psql'))
     install_cmds.append('cd $HOME')
 
     install = build_rule(
         # Don't tag, --prefix doesn't recognise '#'.
         name=f'_{name}_{target}_install',
-        srcs=[extract],
+        srcs=srcs,
         outs = {
             "bin": [f'{target}/psql/bin'],
             "lib": [f'{target}/psql/lib'],
@@ -193,17 +180,18 @@ def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version
     )
 
     env_prefix = ''
+    ai_srcs = {
+        "pg": [pg_download],
+        "pgvector": [pgvector_download],
+        "age": [age_download],
+    }
     if CONFIG.OS == 'darwin':
-        pkg_config_dirs = [
-            '/opt/homebrew/opt/icu4c/lib/pkgconfig',
-            '/opt/homebrew/opt/readline/lib/pkgconfig',
-        ]
-        # The oldest macOS the binaries run on; without it, the build host's.
-        env_prefix = (
-            'export PATH="/opt/homebrew/bin:$PATH" && '
-            'export PKG_CONFIG_PATH="' + ':'.join(pkg_config_dirs) + ':${PKG_CONFIG_PATH:-}" && '
-            'export MACOSX_DEPLOYMENT_TARGET=14.0 && '
-        )
+        # As postgres(): ICU built here and linked in statically, nothing from
+        # Homebrew.
+        env_prefix = _DARWIN_ENV
+        if _builds_with_icu(version):
+            ai_srcs["icu"] = [_darwin_icu(f'_{name}_icu_{target}')]
+            configure_flags = configure_flags + _darwin_icu_configure_args()
 
     out_dir = f'ai-{target}'
     psql_dir = f'$HOME/{out_dir}/psql'
@@ -232,16 +220,7 @@ def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version
 
     if CONFIG.OS == 'darwin':
         install_cmds += [
-            f'install_name_tool -id @rpath/libpq.5.dylib {psql_dir}/lib/libpq.5.dylib',
-            f'test -L {psql_dir}/lib/libpq.dylib || install_name_tool -id @rpath/libpq.dylib {psql_dir}/lib/libpq.dylib',
-            f'for bin in {psql_dir}/bin/*; do '
-                f'if otool -L "$bin" 2>/dev/null | grep -q "libpq.5.dylib"; then '
-                    f'install_name_tool -change '
-                    f'"$(otool -L "$bin" | grep libpq.5.dylib | awk \'{{print $1}}\')" '
-                    f'@executable_path/../lib/libpq.5.dylib '
-                    f'"$bin"; '
-                f'fi; '
-            f'done',
+            _darwin_relocate(psql_dir),
             # Create .dylib symlinks for extension .so files. PG16+ builds them
             # as .dylib on macOS already, so there may be no *.so: the loop
             # must not fail when the glob matches nothing.
@@ -250,11 +229,7 @@ def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version
 
     install = build_rule(
         name=f'_{name}_{target}_install',
-        srcs={
-            "pg": [pg_download],
-            "pgvector": [pgvector_download],
-            "age": [age_download],
-        },
+        srcs=ai_srcs,
         outs = {
             "bin": [f'{out_dir}/psql/bin'],
             "lib": [f'{out_dir}/psql/lib'],
@@ -297,7 +272,91 @@ def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version
         )
 
 
-RELEASE_VERSION = "v0.0.6"
+
+# ICU, which PostgreSQL 16+ builds with by default, for the macOS binaries.
+# Built from source as static libraries and linked into them, so they never
+# depend on a Homebrew keg: Homebrew moves `icu4c` to each new major version
+# and deprecates the old one, and a binary linked against
+# /opt/homebrew/opt/icu4c@<N> stops starting when that keg goes.
+_ICU_VERSION = "78.3"
+_ICU_SHA256 = "3a2e7a47604ba702f345878308e6fefeca612ee895cf4a5f222e7955fabfe0c0"
+
+# The oldest macOS the binaries run on; without it, the build host's.
+_DARWIN_ENV = 'export MACOSX_DEPLOYMENT_TARGET=14.0 && '
+
+
+def _darwin_relocate(psql_dir:str):
+    """Makes a macOS install load its own libraries relative to itself.
+
+    make install records every library by its absolute path in the build
+    directory, which exists only on the machine that built it: libpq for the
+    binaries, dblink, postgres_fdw and libpqwalreceiver, and libpgtypes and
+    libecpg for each other. Each library's own name becomes @rpath/<name>, and
+    every reference to a library under the install becomes a path from the
+    file that holds it (@loader_path/<relative path>/<name>).
+    """
+    return (
+        'find ' + psql_dir + '/bin ' + psql_dir + '/lib -type f | while read -r f; do '
+            'otool -h "$f" > /dev/null 2>&1 || continue; '
+            'id=$(otool -D "$f" | sed -n 2p); '
+            'case "$id" in ' + psql_dir + '/*) install_name_tool -id "@rpath/${id##*/}" "$f" ;; esac; '
+            'otool -L "$f" | sed 1d | awk \'{print $1}\' | { grep "^' + psql_dir + '/" || true; } | { grep -vxF "$id" || true; } | while read -r dep; do '
+                'rel=$(perl -MFile::Spec -e \'print File::Spec->abs2rel(@ARGV)\' "${dep%/*}" "${f%/*}"); '
+                'install_name_tool -change "$dep" "@loader_path/$rel/${dep##*/}" "$f"; '
+            'done; '
+        'done'
+    )
+
+
+def _builds_with_icu(version:str):
+    # configure turns ICU on by default from PostgreSQL 16; before that only
+    # --with-icu does, which these builds do not pass.
+    return int(version.split('.')[0]) >= 16
+
+
+def _darwin_icu(name:str):
+    # Not a tag: the rule's build directory is named after it, and ICU's
+    # makefiles, like PostgreSQL's, cannot take the '#' a tag puts in it.
+    prefix = name.lstrip('_') + f'-{_ICU_VERSION}'
+    download = remote_file(
+        name = tag(name, "download"),
+        # Per caller: postgres() and postgres_ai() share a package.
+        out = f"{prefix}-sources.tgz",
+        url = f"https://github.com/unicode-org/icu/releases/download/release-{_ICU_VERSION}/icu4c-{_ICU_VERSION}-sources.tgz",
+        hashes = [_ICU_SHA256],
+    )
+    return build_rule(
+        name = name,
+        srcs = [download],
+        outs = [prefix],
+        cmd = ' && '.join([
+            'tar -xzf $SRC',
+            'cd icu/source',
+            # Static libraries with the data compiled in, so nothing is
+            # loaded from disk at run time; no plugin loading, tests, samples
+            # or the libraries PostgreSQL does not use.
+            _DARWIN_ENV + f'./configure --prefix "$HOME/{prefix}" '
+                '--enable-static --disable-shared --with-data-packaging=static --disable-dyload '
+                '--disable-tests --disable-samples --disable-extras --disable-icuio --disable-layoutex',
+            'make -j"$(getconf _NPROCESSORS_ONLN)"',
+            'make install',
+        ]),
+        build_timeout = 3600,
+        building_description = f'Building ICU {_ICU_VERSION}...',
+    )
+
+
+def _darwin_icu_configure_args():
+    # Set, configure takes these instead of asking pkg-config. ICU is C++, so
+    # the C++ runtime comes too: macOS's own libc++.
+    icu = f'$HOME/$SRCS_ICU'
+    return [
+        f'ICU_CFLAGS="-I{icu}/include"',
+        f'ICU_LIBS="-L{icu}/lib -licui18n -licuuc -licudata -lc++"',
+    ]
+
+
+RELEASE_VERSION = "v0.0.7"
 
 
 def _resolve_target():
