@@ -60,7 +60,7 @@ def postgres(name:str, version:str, os=None, arch=None, hashes:list=[], visibili
         # is the system libedit).
         env_prefix = _DARWIN_ENV
         if _builds_with_icu(version):
-            icu = _darwin_icu(tag(name, f'icu_{target}'))
+            icu = _darwin_icu(f'_{name}_icu_{target}')
             srcs = {'pg': [extract], 'icu': [icu]}
             src_dir = '$SRCS_PG'
             configure_flags = configure_flags + _darwin_icu_configure_args()
@@ -190,7 +190,7 @@ def postgres_ai(name:str, version:str, pgvector_version:str="0.8.0", age_version
         # Homebrew.
         env_prefix = _DARWIN_ENV
         if _builds_with_icu(version):
-            ai_srcs["icu"] = [_darwin_icu(tag(name, f'icu_{target}'))]
+            ai_srcs["icu"] = [_darwin_icu(f'_{name}_icu_{target}')]
             configure_flags = configure_flags + _darwin_icu_configure_args()
 
     out_dir = f'ai-{target}'
@@ -315,8 +315,9 @@ def _builds_with_icu(version:str):
 
 
 def _darwin_icu(name:str):
-    # The install prefix: configure's --prefix does not take a '#'.
-    prefix = name.lstrip('_').replace('#', '_') + f'-{_ICU_VERSION}'
+    # Not a tag: the rule's build directory is named after it, and ICU's
+    # makefiles, like PostgreSQL's, cannot take the '#' a tag puts in it.
+    prefix = name.lstrip('_') + f'-{_ICU_VERSION}'
     download = remote_file(
         name = tag(name, "download"),
         # Per caller: postgres() and postgres_ai() share a package.
